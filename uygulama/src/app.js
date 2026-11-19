@@ -1,15 +1,33 @@
 import express from 'express';
+import session from 'express-session';
+
 import menuRoutes from './routes/menuRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 const app = express();
 
-// JSON isteklerini okuyabilmek için
-app.use(express.json());
-
-// Sunucu bilgisini gizle
 app.disable('x-powered-by');
 
-// Menü API adreslerini bağla
+app.use(express.json());
+
+// Oturum yönetimi
+app.use(session({
+    name: 'yemekhane.sid',
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        maxAge: 30 * 60 * 1000
+    }
+}));
+
+// Kullanıcı giriş ve çıkış
+app.use('/api/auth', authRoutes);
+
+// Menü işlemleri
 app.use('/api', menuRoutes);
 
 // API sağlık kontrolü
@@ -30,7 +48,7 @@ app.use((req, res) => {
     });
 });
 
-// Genel hata yönetimi
+// Hata yönetimi
 app.use((err, req, res, next) => {
     console.error('API hatası:', err);
 

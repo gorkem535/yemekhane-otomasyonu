@@ -24,6 +24,7 @@ x-mysql-ortak: &mysql-ortak
 # 3307 / 3308 yalnızca kendi bilgisayarınızdan (DBeaver, Workbench) bağlanmak içindir.
 x-uygulama-ortam: &uygulama-ortam
   TZ: Europe/Istanbul
+  SESSION_SECRET: "yemekhane-gelistirme-oturum-anahtari-2026"
   DB_YAZMA_HOST: mysql-primary
   DB_OKUMA_HOST: mysql-replica
   DB_PORT: "3306"
