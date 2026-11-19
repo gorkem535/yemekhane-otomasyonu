@@ -1,14 +1,18 @@
 import express from 'express';
+import menuRoutes from './routes/menuRoutes.js';
 
 const app = express();
 
 // JSON isteklerini okuyabilmek için
 app.use(express.json());
 
-// Sunucu bilgilerini gizle
+// Sunucu bilgisini gizle
 app.disable('x-powered-by');
 
-// İlk API adresimiz
+// Menü API adreslerini bağla
+app.use('/api', menuRoutes);
+
+// API sağlık kontrolü
 app.get('/api/', (req, res) => {
     res.status(200).json({
         basarili: true,
@@ -18,7 +22,7 @@ app.get('/api/', (req, res) => {
     });
 });
 
-// Bulunamayan API adresleri
+// Bulunamayan adresler
 app.use((req, res) => {
     res.status(404).json({
         basarili: false,
@@ -30,9 +34,11 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
     console.error('API hatası:', err);
 
-    res.status(500).json({
+    res.status(err.statusCode || 500).json({
         basarili: false,
-        mesaj: 'Sunucu hatası oluştu.'
+        mesaj: err.statusCode
+            ? err.message
+            : 'Sunucu hatası oluştu.'
     });
 });
 
