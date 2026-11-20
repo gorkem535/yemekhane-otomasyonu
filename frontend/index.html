@@ -1,70 +1,165 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Yemekhane Otomasyonu · Başlangıç</title>
+  <meta name="theme-color" content="#173f35">
+  <title>Kampüs Sofrası | Yemekhane Otomasyonu</title>
   <link rel="stylesheet" href="/css/temel.css">
-  <style>
-    /* Yalnızca bu geçici sayfaya ait stiller */
-    .fis {
-      background: var(--yuzey);
-      margin-block: 2rem;
-      padding: 1.5rem var(--bosluk);
-      border-radius: var(--kose);
-      /* yemek fişi görünümü: alt kenarda yırtma çizgisi */
-      border-bottom: 2px dashed var(--cizgi);
-    }
-    .fis h1 { margin-bottom: 0.25rem; }
-    .fis .alt { color: var(--metin-soluk); margin-bottom: 1.5rem; }
-    .servisler { width: 100%; border-collapse: collapse; font-size: var(--boyut-kucuk); }
-    .servisler th, .servisler td { text-align: left; padding: 0.5rem 0.25rem; border-bottom: 1px solid var(--cizgi); }
-    .servisler td:last-child { white-space: nowrap; }
-    #uygulama-durumu { margin-top: 1.5rem; }
-  </style>
+  <script src="/js/app.js" defer></script>
 </head>
 <body>
-  <main class="kapsayici">
-    <section class="fis">
-      <h1>Yemekhane Otomasyonu</h1>
-      <p class="alt">Apache çalışıyor. Bu sayfa başlangıç paketine ait; kendi giriş ekranınızla değiştirin.</p>
+  <div id="toast-area" class="toast-area" aria-live="polite" aria-atomic="true"></div>
 
-      <div class="tablo-kaydir">
-        <table class="servisler">
-          <thead>
-            <tr><th>Servis</th><th>Görevi</th><th>Bilgisayarınızdan</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>frontend</td><td>HTML/CSS, yönlendirme</td><td>localhost:8080</td></tr>
-            <tr><td>mysql-primary</td><td>yazma</td><td>localhost:3307</td></tr>
-            <tr><td>mysql-replica</td><td>okuma, salt okunur</td><td>localhost:3308</td></tr>
-            <tr><td>redis</td><td>menü önbelleği, oturum</td><td>localhost:6379</td></tr>
-            <tr><td>uygulama</td><td>sizin yazacağınız servis</td><td>Apache üzerinden</td></tr>
-          </tbody>
-        </table>
+  <!-- Giriş ekranı -->
+  <main id="login-view" class="login-shell">
+    <section class="login-brand">
+      <div class="brand-mark">KS</div>
+      <p class="eyebrow">KAMPÜS YAŞAMI</p>
+      <h1>Kampüs Sofrası</h1>
+      <p class="brand-copy">Günün menüsünü keşfet, yerini ayırt, bakiyeni yönet.</p>
+      <div class="brand-foot"><span class="brand-dot"></span> Yemekhane işlemleri tek yerde</div>
+    </section>
+    <section class="login-panel">
+      <div class="login-card">
+        <p class="eyebrow">HOŞ GELDİN</p>
+        <h2>Hesabına giriş yap</h2>
+        <p class="muted">Devam etmek için kampüs hesabınla oturum aç.</p>
+        <form id="login-form" class="form-stack">
+          <div class="field">
+            <label for="login-email">E-posta adresi</label>
+            <input id="login-email" name="eposta" type="email" autocomplete="username" placeholder="ornek@kampus.edu.tr" required>
+          </div>
+          <div class="field">
+            <label for="login-password">Şifre</label>
+            <input id="login-password" name="sifre" type="password" autocomplete="current-password" placeholder="Şifren" required>
+          </div>
+          <p id="login-error" class="form-error" role="alert"></p>
+          <button class="button button-primary button-wide" type="submit">Giriş yap <span aria-hidden="true">→</span></button>
+        </form>
+        <p class="login-note">Güvenli oturum · 30 dakika hareketsizlikte sona erer</p>
       </div>
-
-      <p id="uygulama-durumu" class="bildirim" role="status">Uygulama servisi kontrol ediliyor…</p>
     </section>
   </main>
 
-  <script>
-    // Web API modunda /api/ isteği uygulamaya gider. 502/503 ise uygulama yok ya da çalışmıyor.
-    const kutu = document.getElementById('uygulama-durumu');
-    fetch('/api/', { headers: { Accept: 'application/json' } })
-      .then(yanit => {
-        if (yanit.status === 502 || yanit.status === 503) {
-          kutu.textContent = 'Uygulama servisine ulaşılamıyor. docker-compose.yml içindeki uygulama servisini ekleyip "docker compose up -d" çalıştırın.';
-          kutu.classList.add('bildirim-hata');
-        } else {
-          kutu.textContent = 'Uygulama servisi yanıt veriyor (HTTP ' + yanit.status + ').';
-          kutu.classList.add('bildirim-basari');
-        }
-      })
-      .catch(() => {
-        kutu.textContent = 'İstek gönderilemedi. Apache günlüğüne bakın: docker compose logs frontend';
-        kutu.classList.add('bildirim-hata');
-      });
-  </script>
+  <!-- Uygulama -->
+  <div id="app-view" class="app-shell" hidden>
+    <aside id="sidebar" class="sidebar">
+      <a class="sidebar-brand" href="#gunluk" data-view="daily" aria-label="Kampüs Sofrası ana sayfa">
+        <span class="brand-mark brand-mark-small">KS</span>
+        <span><strong>Kampüs Sofrası</strong><small>Yemekhane otomasyonu</small></span>
+      </a>
+      <div class="sidebar-label">MENÜ</div>
+      <nav class="main-nav" aria-label="Ana menü">
+        <button class="nav-item active" type="button" data-view="daily"><span class="nav-icon">▦</span> Günlük menü</button>
+        <button class="nav-item" type="button" data-view="weekly"><span class="nav-icon">▤</span> Haftalık menü</button>
+        <button class="nav-item" type="button" data-view="reservations"><span class="nav-icon">▣</span> Rezervasyonlarım</button>
+        <button class="nav-item" type="button" data-view="balance"><span class="nav-icon">₺</span> Bakiyem</button>
+        <button class="nav-item" type="button" data-view="reviews"><span class="nav-icon">☆</span> Değerlendirmeler</button>
+        <button id="admin-nav" class="nav-item" type="button" data-view="admin" hidden><span class="nav-icon">⚙</span> Yönetici paneli</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-help"><span class="help-symbol">i</span><span><strong>Bilgi</strong><small>Rezervasyon son saatini kontrol etmeyi unutma.</small></span></div>
+        <button id="logout-button" class="logout-button" type="button"><span>↪</span> Güvenli çıkış yap</button>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <button id="mobile-menu-button" class="icon-button mobile-menu-button" type="button" aria-label="Menüyü aç">☰</button>
+        <div class="breadcrumb"><span>Kampüs Sofrası</span><span class="breadcrumb-sep">/</span><strong id="page-breadcrumb">Günlük menü</strong></div>
+        <div class="topbar-user">
+          <div class="user-copy"><strong id="user-name">Kullanıcı</strong><small id="user-role">Öğrenci</small></div>
+          <div id="user-avatar" class="avatar">K</div>
+        </div>
+      </header>
+
+      <div class="content-wrap">
+        <!-- Günlük menü -->
+        <section id="page-daily" class="page-section">
+          <div class="page-heading">
+            <div><p class="eyebrow">BUGÜN NE YESEK?</p><h1>Günlük menü</h1><p class="muted">Yemekleri incele, uygun menü için rezervasyonunu oluştur.</p></div>
+            <div class="date-chip"><span class="date-chip-icon">◷</span><span id="today-label">Bugün</span></div>
+          </div>
+          <div class="filter-bar">
+            <div class="field filter-field"><label for="daily-canteen">Yemekhane</label><select id="daily-canteen"><option value="">Tüm yemekhaneler</option></select></div>
+            <div class="field filter-field"><label for="daily-meal">Öğün</label><select id="daily-meal"><option value="">Tüm öğünler</option></select></div>
+            <button id="daily-refresh" class="button button-secondary filter-action" type="button">Menüyü getir</button>
+          </div>
+          <div id="daily-menu-list" class="menu-list"><div class="loading-state">Menüler yükleniyor…</div></div>
+        </section>
+
+        <!-- Haftalık menü -->
+        <section id="page-weekly" class="page-section" hidden>
+          <div class="page-heading"><div><p class="eyebrow">PLANINI ÖNCEDEN YAP</p><h1>Haftalık menü</h1><p class="muted">Önümüzdeki günlerin menülerini görüntüleyip yerini ayırt.</p></div></div>
+          <div class="filter-bar weekly-filter">
+            <div class="field filter-field"><label for="weekly-start">Başlangıç tarihi</label><input id="weekly-start" type="date"></div>
+            <div class="field filter-field"><label for="weekly-canteen">Yemekhane</label><select id="weekly-canteen"><option value="">Tüm yemekhaneler</option></select></div>
+            <button id="weekly-refresh" class="button button-secondary filter-action" type="button">Haftayı getir</button>
+          </div>
+          <div id="weekly-menu-list" class="menu-list"><div class="empty-state">Bir hafta seçerek menüleri görüntüleyebilirsin.</div></div>
+        </section>
+
+        <!-- Rezervasyonlar -->
+        <section id="page-reservations" class="page-section" hidden>
+          <div class="page-heading"><div><p class="eyebrow">YEMEK PLANIN</p><h1>Rezervasyonlarım</h1><p class="muted">Aktif, kullanılmış ve iptal edilmiş rezervasyonlarını takip et.</p></div><button id="reservations-refresh" class="button button-secondary" type="button">Yenile</button></div>
+          <div class="status-tabs" role="group" aria-label="Rezervasyon durumuna göre filtrele">
+            <button class="status-tab active" type="button" data-res-filter="all">Tümü</button>
+            <button class="status-tab" type="button" data-res-filter="aktif">Aktif</button>
+            <button class="status-tab" type="button" data-res-filter="kullanildi">Kullanılmış</button>
+            <button class="status-tab" type="button" data-res-filter="iptal">İptal</button>
+          </div>
+          <div id="reservation-list" class="list-panel"><div class="loading-state">Rezervasyonlar yükleniyor…</div></div>
+        </section>
+
+        <!-- Bakiye -->
+        <section id="page-balance" class="page-section" hidden>
+          <div class="page-heading"><div><p class="eyebrow">HESAP BİLGİLERİ</p><h1>Bakiyem</h1><p class="muted">Mevcut bakiyeni ve geçmiş para hareketlerini görüntüle.</p></div></div>
+          <div class="balance-layout">
+            <article class="balance-card"><div class="balance-card-top"><span>GÜNCEL BAKİYE</span><span class="balance-icon">₺</span></div><div id="balance-amount" class="balance-amount">₺0,00</div><p>Yemekhane işlemlerinde kullanılabilir bakiyen.</p><div class="balance-card-footer"><span>Hesap sahibi</span><strong id="balance-owner">—</strong></div></article>
+            <article class="panel-card topup-card"><div class="panel-heading"><div><h2>Bakiye yükle</h2><p class="muted">10 TL – 1.000 TL arasında yükleme yapabilirsin.</p></div><span class="panel-icon">＋</span></div><form id="topup-form" class="topup-form"><div class="field"><label for="topup-amount">Yükleme tutarı (TL)</label><input id="topup-amount" type="number" min="10" max="1000" step="0.01" placeholder="Örn. 100" required></div><button class="button button-primary" type="submit">Yükleme yap</button></form><p class="small-note">Bu proje kapsamında yükleme işlemi test amaçlıdır; gerçek ödeme alınmaz.</p></article>
+          </div>
+          <div class="section-heading"><div><h2>Hesap hareketleri</h2><p class="muted">Son bakiye işlemlerin</p></div><button id="balance-refresh" class="text-button" type="button">Yenile ↻</button></div>
+          <div id="balance-movements" class="table-panel"><div class="loading-state">Hareketler yükleniyor…</div></div>
+        </section>
+
+        <!-- Değerlendirmeler -->
+        <section id="page-reviews" class="page-section" hidden>
+          <div class="page-heading"><div><p class="eyebrow">GERİ BİLDİRİMİN DEĞERLİ</p><h1>Menü değerlendirmeleri</h1><p class="muted">Yalnızca tükettiğin menüler için puan ve yorum bırakabilirsin.</p></div><button id="reviews-refresh" class="button button-secondary" type="button">Yenile</button></div>
+          <div id="review-list" class="review-grid"><div class="loading-state">Değerlendirmeler yükleniyor…</div></div>
+        </section>
+
+        <!-- Yönetici -->
+        <section id="page-admin" class="page-section" hidden>
+          <div class="page-heading"><div><p class="eyebrow">SİSTEM YÖNETİMİ</p><h1>Yönetici paneli</h1><p class="muted">Menü oluştur, mevcut menüleri düzenle ve doluluk raporlarını incele.</p></div><button id="admin-refresh" class="button button-secondary" type="button">Raporları yenile</button></div>
+          <div id="admin-stats" class="stats-grid"><div class="stat-card"><span>Toplam menü</span><strong>—</strong></div><div class="stat-card"><span>Toplam rezervasyon</span><strong>—</strong></div><div class="stat-card"><span>Ortalama puan</span><strong>—</strong></div></div>
+          <div class="admin-layout">
+            <article class="panel-card admin-form-card">
+              <div class="panel-heading"><div><h2 id="admin-form-title">Yeni menü oluştur</h2><p class="muted">Yemekhane, öğün, fiyat ve yemekleri belirle.</p></div><span class="panel-icon">＋</span></div>
+              <form id="admin-menu-form" class="form-stack">
+                <input id="admin-menu-id" type="hidden">
+                <div class="form-two-col">
+                  <div class="field"><label for="admin-date">Tarih</label><input id="admin-date" type="date" required></div>
+                  <div class="field"><label for="admin-canteen">Yemekhane</label><select id="admin-canteen" required><option value="">Seçiniz</option></select></div>
+                </div>
+                <div class="field"><label for="admin-meal">Öğün</label><select id="admin-meal" required><option value="">Seçiniz</option></select></div>
+                <div class="form-two-col">
+                  <div class="field"><label for="admin-student-price">Öğrenci fiyatı (TL)</label><input id="admin-student-price" type="number" min="0" step="0.01" required></div>
+                  <div class="field"><label for="admin-staff-price">Personel fiyatı (TL)</label><input id="admin-staff-price" type="number" min="0" step="0.01" required></div>
+                </div>
+                <div class="field"><label>Menüdeki yemekler</label><div id="admin-food-options" class="food-options"><span class="muted">Yemek listesi yükleniyor…</span></div></div>
+                <div class="form-actions"><button id="admin-cancel-edit" class="button button-secondary" type="button" hidden>Vazgeç</button><button class="button button-primary" type="submit">Menüyü kaydet</button></div>
+                <p id="admin-form-error" class="form-error" role="alert"></p>
+              </form>
+            </article>
+            <article class="panel-card report-card"><div class="panel-heading"><div><h2>Menü performansı</h2><p class="muted">Doluluk ve değerlendirme özeti</p></div></div><div id="admin-reports" class="table-panel inner-table"><div class="loading-state">Raporlar yükleniyor…</div></div></article>
+          </div>
+        </section>
+
+        <footer class="app-footer"><span>© 2026 Kampüs Sofrası</span><span>Yemekhane Otomasyonu · Web Teknolojileri</span></footer>
+      </div>
+    </main>
+    <div id="sidebar-scrim" class="sidebar-scrim" hidden></div>
+  </div>
 </body>
 </html>
