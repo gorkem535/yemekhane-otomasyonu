@@ -3,6 +3,10 @@ import session from 'express-session';
 
 import menuRoutes from './routes/menuRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import reservationRoutes from './routes/reservationRoutes.js';
+import balanceRoutes from './routes/balanceRoutes.js';
+import reviewRoutes from './routes/reviewRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 const app = express();
 
@@ -26,6 +30,17 @@ app.use(session({
 
 // Kullanıcı giriş ve çıkış
 app.use('/api/auth', authRoutes);
+// Rezervasyon işlemleri
+app.use('/api/rezervasyonlar', reservationRoutes);
+
+// Bakiye işlemleri
+app.use('/api/bakiye', balanceRoutes);
+
+// Değerlendirme işlemleri
+app.use('/api/degerlendirmeler', reviewRoutes);
+
+// Yönetici paneli işlemleri
+app.use('/api/yonetici', adminRoutes);
 
 // Menü işlemleri
 app.use('/api', menuRoutes);
