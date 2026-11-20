@@ -7,7 +7,6 @@ export async function giris(req, res, next) {
 
         const kullanici = await girisYap(eposta, sifre);
 
-        // Yeni oturum oluştur
         req.session.regenerate((error) => {
             if (error) {
                 return next(error);
@@ -48,5 +47,13 @@ export function cikis(req, res, next) {
             basarili: true,
             mesaj: 'Çıkış başarılı.'
         });
+    });
+}
+
+// Mevcut oturumdaki kullanıcı bilgilerini getir
+export function oturumBilgisi(req, res) {
+    return res.status(200).json({
+        basarili: true,
+        kullanici: req.session.kullanici
     });
 }
