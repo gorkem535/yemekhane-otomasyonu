@@ -9,6 +9,7 @@ import reservationRoutes from './routes/reservationRoutes.js';
 import balanceRoutes from './routes/balanceRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import profileRoutes from './routes/profileRoutes.js';
 
 const app = express();
 
@@ -55,6 +56,9 @@ app.use('/api/yonetici', adminRoutes);
 
 // Menü işlemleri
 app.use('/api', menuRoutes);
+
+// Profil ve alerjen tercihleri
+app.use('/api/profil', profileRoutes);
 
 // API sağlık kontrolü
 app.get('/api/', (req, res) => {

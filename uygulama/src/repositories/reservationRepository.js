@@ -1,14 +1,19 @@
 import { yazmaDb, okumaDb } from '../config/database.js';
 
 // Yeni rezervasyon oluştur
-export async function rezervasyonOlustur(kullaniciId, menuId) {
+export async function rezervasyonOlustur(
+    kullaniciId,
+    menuId,
+    porsiyon
+) {
     const [sonuc] = await yazmaDb.query(
-        'CALL sp_rezervasyon_yap(?, ?)',
-        [kullaniciId, menuId]
+        'CALL sp_rezervasyon_yap(?, ?, ?)',
+        [kullaniciId, menuId, porsiyon]
     );
 
     return sonuc[0][0];
 }
+
 
 // Mevcut rezervasyonu iptal et
 export async function rezervasyonuIptalEt(kullaniciId, rezervasyonId) {
@@ -27,6 +32,7 @@ export async function kullanicininRezervasyonlariniGetir(kullaniciId) {
             r.id AS rezervasyon_id,
             r.menu_id,
             r.durum,
+            r.porsiyon,
             r.ucret,
             r.olusturma,
             r.kullanma_zamani,

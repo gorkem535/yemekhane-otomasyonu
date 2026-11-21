@@ -20,7 +20,7 @@ function pozitifTamSayiKontrolEt(deger, alan) {
 }
 
 // Yeni rezervasyon oluştur
-export async function rezervasyonYap(kullaniciId, menuId) {
+export async function rezervasyonYap(kullaniciId, menuId, porsiyon) {
     const kullanici = pozitifTamSayiKontrolEt(
         kullaniciId,
         'Kullanıcı ID'
@@ -31,8 +31,20 @@ export async function rezervasyonYap(kullaniciId, menuId) {
         'Menü ID'
     );
 
+    const secilenPorsiyon = porsiyon ?? 'tam';
+
+    if (!['tam', 'yarim'].includes(secilenPorsiyon)) {
+        const hata = new Error('Geçersiz porsiyon seçimi.');
+        hata.statusCode = 400;
+        throw hata;
+    }
+
     try {
-        return await rezervasyonOlustur(kullanici, menu);
+        return await rezervasyonOlustur(
+            kullanici,
+            menu,
+            secilenPorsiyon
+        );
     } catch (error) {
         if (error.sqlState === '45000' || error.errno === 1644) {
             error.statusCode = 400;

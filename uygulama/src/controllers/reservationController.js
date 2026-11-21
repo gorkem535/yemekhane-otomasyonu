@@ -25,9 +25,10 @@ export async function rezervasyonlariGetir(req, res, next) {
 export async function rezervasyonOlustur(req, res, next) {
     try {
         const sonuc = await rezervasyonYap(
-            req.session.kullanici.id,
-            req.body.menuId
-        );
+    req.session.kullanici.id,
+    req.body.menuId,
+    req.body.porsiyon ?? 'tam'
+);
 
         return res.status(201).json({
             basarili: true,

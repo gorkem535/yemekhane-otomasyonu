@@ -56,6 +56,7 @@
         <button class="nav-item" type="button" data-view="reservations"><span class="nav-icon">▣</span> Rezervasyonlarım</button>
         <button class="nav-item" type="button" data-view="balance"><span class="nav-icon">₺</span> Bakiyem</button>
         <button class="nav-item" type="button" data-view="reviews"><span class="nav-icon">☆</span> Değerlendirmeler</button>
+        <button class="nav-item" type="button" data-view="profile"><span class="nav-icon">♡</span> Profilim</button>
         <button id="admin-nav" class="nav-item" type="button" data-view="admin" hidden><span class="nav-icon">⚙</span> Yönetici paneli</button>
       </nav>
       <div class="sidebar-bottom">
@@ -128,6 +129,36 @@
           <div class="page-heading"><div><p class="eyebrow">GERİ BİLDİRİMİN DEĞERLİ</p><h1>Menü değerlendirmeleri</h1><p class="muted">Yalnızca tükettiğin menüler için puan ve yorum bırakabilirsin.</p></div><button id="reviews-refresh" class="button button-secondary" type="button">Yenile</button></div>
           <div id="review-list" class="review-grid"><div class="loading-state">Değerlendirmeler yükleniyor…</div></div>
         </section>
+
+        <!-- Profil ve alerjen tercihleri -->
+<section id="page-profile" class="page-section" hidden>
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">KİŞİSEL TERCİHLER</p>
+      <h1>Alerjen tercihlerim</h1>
+      <p class="muted">Tüketmediğin veya alerjin olan maddeleri seç. Menüde bu maddeleri içeren yemekler için uyarı gösterilecek.</p>
+    </div>
+  </div>
+
+  <article class="panel-card">
+    <div class="panel-heading">
+      <div>
+        <h2>Alerjenleri seç</h2>
+        <p class="muted">Birden fazla seçim yapabilirsin.</p>
+      </div>
+      <span class="panel-icon">♡</span>
+    </div>
+
+    <form id="profile-allergen-form" class="form-stack">
+      <div id="allergen-options" class="food-options">
+        <span class="muted">Alerjenler yükleniyor…</span>
+      </div>
+      <div class="form-actions">
+        <button class="button button-primary" type="submit">Tercihlerimi kaydet</button>
+      </div>
+    </form>
+  </article>
+</section>
 
         <!-- Yönetici -->
         <section id="page-admin" class="page-section" hidden>

@@ -7,7 +7,9 @@ const state = {
   recentMenuIds: new Set(),
   reservationFilter: 'all',
   adminOptions: { yemekhaneler: [], ogunler: [], yemekler: [] },
-  adminReports: []
+  adminReports: [],
+  profileAllergens: [],
+  selectedAllergenIds: new Set()
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -124,9 +126,17 @@ function showApp(user) {
   $('#today-label').textContent = formatDate(todayISO());
   $('#weekly-start').value = todayISO();
 
-  // Önce yemekhane ve öğün seçeneklerini yükle, sonra günlük menüyü aç.
+  // Önce yemekhane ve öğün seçeneklerini yükle, sonra alerjen tercihlerini getir.
   loadMenuOptions()
-    .then(() => changeView('daily'))
+    .then(async () => {
+      try {
+        await loadProfile();
+      } catch (error) {
+        toast(`Alerjen tercihleri yüklenemedi: ${error.message}`, 'error');
+      }
+
+      changeView('daily');
+    })
     .catch(error => {
       toast(`Filtre seçenekleri yüklenemedi: ${error.message}`, 'error');
       changeView('daily');
@@ -176,13 +186,13 @@ async function logout() {
 }
 
 function changeView(name) {
-  const titles = { daily: 'Günlük menü', weekly: 'Haftalık menü', reservations: 'Rezervasyonlarım', balance: 'Bakiyem', reviews: 'Değerlendirmeler', admin: 'Yönetici paneli' };
+  const titles = { daily: 'Günlük menü', weekly: 'Haftalık menü', reservations: 'Rezervasyonlarım', balance: 'Bakiyem', reviews: 'Değerlendirmeler', profile: 'Profilim', admin: 'Yönetici paneli' };
   if (name === 'admin' && state.user?.rol !== 'yonetici') return;
   $$('.page-section').forEach(section => { section.hidden = section.id !== `page-${name}`; });
   $$('.nav-item').forEach(button => button.classList.toggle('active', button.dataset.view === name));
   $('#page-breadcrumb').textContent = titles[name] || 'Ana sayfa';
   closeMobileMenu();
-  const loaders = { daily: loadDailyMenus, weekly: loadWeeklyMenus, reservations: loadReservations, balance: loadBalance, reviews: loadReviews, admin: loadAdmin };
+  const loaders = { daily: loadDailyMenus, weekly: loadWeeklyMenus, reservations: loadReservations, balance: loadBalance, reviews: loadReviews, profile: loadProfile, admin: loadAdmin };
   loaders[name]?.().catch(error => toast(error.message, 'error'));
 }
 
@@ -207,9 +217,12 @@ async function loadMenuRows(start, end, canteenId = '', mealId = '') {
 
 function groupMenus(rows) {
   const map = new Map();
+
   for (const row of rows) {
     const id = getFirst(row, ['menu_id', 'menuId', 'id']);
+
     if (id === '') continue;
+
     if (!map.has(String(id))) {
       map.set(String(id), {
         id,
@@ -227,8 +240,10 @@ function groupMenus(rows) {
         foods: []
       });
     }
+
     const menu = map.get(String(id));
     const foodId = getFirst(row, ['yemek_id', 'yemekId']);
+
     if (foodId !== '' && !menu.foods.some(food => String(food.id) === String(foodId))) {
       menu.foods.push({
         id: foodId,
@@ -236,11 +251,23 @@ function groupMenus(rows) {
         category: getFirst(row, ['kategori', 'kategori_ad'], ''),
         calories: Number(getFirst(row, ['kalori'], 0)),
         vegetarian: Boolean(Number(getFirst(row, ['vejetaryen'], 0))),
-        allergens: getFirst(row, ['alerjenler'], '')
+        allergens: getFirst(row, ['alerjenler'], ''),
+
+        // Yemeğin alerjen ID'lerini diziye dönüştürüyoruz.
+        allergenIds: String(getFirst(row, ['alerjen_idler'], ''))
+          .split(',')
+          .map(id => id.trim())
+          .filter(Boolean)
+          .map(Number)
       });
     }
   }
-  return [...map.values()].sort((a, b) => `${dateKey(a.date)}-${a.mealId}-${a.canteenId}`.localeCompare(`${dateKey(b.date)}-${b.mealId}-${b.canteenId}`));
+
+  return [...map.values()].sort((a, b) =>
+    `${dateKey(a.date)}-${a.mealId}-${a.canteenId}`.localeCompare(
+      `${dateKey(b.date)}-${b.mealId}-${b.canteenId}`
+    )
+  );
 }
 
 function reservationForMenu(menuId) {
@@ -268,15 +295,101 @@ function renderMenuCard(menu, showDate = false) {
   const full = Number(menu.emptySeats) <= 0;
   const expired = deadlinePassed(menu.deadline);
   const disabled = Boolean(already || full || expired);
+
   const statusText = already ? 'Rezervasyonun var' : full ? 'Kapasite doldu' : expired ? 'Süre doldu' : `${menu.emptySeats} boş yer`;
   const statusClass = already ? 'pill-green' : (full || expired) ? 'pill-red' : 'pill-gold';
-  const foods = menu.foods.map(food => `<div class="food-row"><span class="food-symbol">${food.vegetarian ? '🥬' : '🍴'}</span><div class="food-info"><strong>${escapeHtml(food.name)}</strong><small>${escapeHtml(food.category || 'Menü')}${food.calories ? ` · ${food.calories} kcal` : ''}</small><div class="food-tags">${food.vegetarian ? '<span class="food-tag vegetarian">Vejetaryen</span>' : ''}${food.allergens ? `<span class="food-tag">Alerjen: ${escapeHtml(food.allergens)}</span>` : ''}</div></div></div>`).join('');
+
+  // Yarım porsiyon yalnızca öğle ve akşam öğünlerinde kullanılabilir.
+  const halfPortionAllowed = ['2', '3'].includes(String(menu.mealId));
+
+  const portionSelector = halfPortionAllowed && !already
+    ? `<div class="field portion-field" style="width:150px">
+         <label for="portion-${escapeHtml(menu.id)}">Porsiyon</label>
+         <select class="portion-select" id="portion-${escapeHtml(menu.id)}">
+           <option value="tam">Tam porsiyon</option>
+           <option value="yarim">Yarım porsiyon (%60)</option>
+         </select>
+       </div>`
+    : '';
+
+  const foods = menu.foods.map(food => {
+    const matchedAllergens = (food.allergenIds || [])
+      .filter(id => state.selectedAllergenIds.has(String(id)))
+      .map(id => state.profileAllergens.find(item =>
+        String(getFirst(item, ['id', 'alerjen_id'])) === String(id)
+      ))
+      .filter(Boolean)
+      .map(item => getFirst(item, ['ad', 'name']))
+      .filter(Boolean);
+
+    const allergenWarning = matchedAllergens.length
+      ? `<span class="food-tag allergen-warning" role="alert">⚠️ Seçtiğin alerjen: ${escapeHtml(matchedAllergens.join(', '))}</span>`
+      : '';
+
+    return `<div class="food-row">
+      <span class="food-symbol">${food.vegetarian ? '🥬' : '🍴'}</span>
+      <div class="food-info">
+        <strong>${escapeHtml(food.name)}</strong>
+        <small>${escapeHtml(food.category || 'Menü')}${food.calories ? ` · ${food.calories} kcal` : ''}</small>
+        <div class="food-tags">
+          ${food.vegetarian ? '<span class="food-tag vegetarian">Vejetaryen</span>' : ''}
+          ${food.allergens ? `<span class="food-tag">Alerjen: ${escapeHtml(food.allergens)}</span>` : ''}
+          ${allergenWarning}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
   return `<article class="menu-card" data-menu-id="${escapeHtml(menu.id)}">
-    <div class="menu-card-head"><div class="menu-title"><span class="meal-icon">${mealEmoji(menu.meal)}</span><div><h3>${escapeHtml(menu.meal)}</h3><p>${escapeHtml(menu.canteen)}${showDate ? ` · ${escapeHtml(formatDate(menu.date))}` : ''}</p></div></div><div class="menu-meta"><span class="pill ${statusClass}">${escapeHtml(statusText)}</span></div></div>
-    <div class="food-grid">${foods || '<div class="empty-state">Bu menüye henüz yemek eklenmemiş.</div>'}</div>
-    <div class="menu-card-footer"><div class="menu-summary"><div class="summary-item"><span>Toplam enerji</span><strong>${calories.toLocaleString('tr-TR')} kcal</strong></div><div class="summary-item"><span>Rezervasyon sonu</span><strong>${escapeHtml(formatTime(menu.deadline))}</strong></div><div class="summary-item"><span>Doluluk</span><strong>${Number(menu.capacity) ? `${Number(menu.reserved)} / ${Number(menu.capacity)}` : '—'}</strong></div></div><div class="menu-actions"><span class="menu-price">${money(price)}</span><button class="button ${disabled ? 'button-secondary' : 'button-primary'} reserve-button" type="button" data-reserve-menu="${escapeHtml(menu.id)}" ${disabled ? 'disabled' : ''}>${already ? 'Rezervasyon mevcut' : full ? 'Yer kalmadı' : expired ? 'Süre doldu' : 'Rezervasyon yap'}</button></div></div>
+    <div class="menu-card-head">
+      <div class="menu-title">
+        <span class="meal-icon">${mealEmoji(menu.meal)}</span>
+        <div>
+          <h3>${escapeHtml(menu.meal)}</h3>
+          <p>${escapeHtml(menu.canteen)}${showDate ? ` · ${escapeHtml(formatDate(menu.date))}` : ''}</p>
+        </div>
+      </div>
+      <div class="menu-meta">
+        <span class="pill ${statusClass}">${escapeHtml(statusText)}</span>
+      </div>
+    </div>
+
+    <div class="food-grid">
+      ${foods || '<div class="empty-state">Bu menüye henüz yemek eklenmemiş.</div>'}
+    </div>
+
+    <div class="menu-card-footer">
+      <div class="menu-summary">
+        <div class="summary-item">
+          <span>Toplam enerji</span>
+          <strong>${calories.toLocaleString('tr-TR')} kcal</strong>
+        </div>
+        <div class="summary-item">
+          <span>Rezervasyon sonu</span>
+          <strong>${escapeHtml(formatTime(menu.deadline))}</strong>
+        </div>
+        <div class="summary-item">
+          <span>Doluluk</span>
+          <strong>${Number(menu.capacity) ? `${Number(menu.reserved)} / ${Number(menu.capacity)}` : '—'}</strong>
+        </div>
+      </div>
+
+      <div class="menu-actions">
+        ${portionSelector}
+        <span class="menu-price"
+          data-menu-price="${escapeHtml(menu.id)}"
+          data-full-price="${escapeHtml(price)}">${money(price)}</span>
+        <button class="button ${disabled ? 'button-secondary' : 'button-primary'} reserve-button"
+          type="button"
+          data-reserve-menu="${escapeHtml(menu.id)}"
+          ${disabled ? 'disabled' : ''}>
+          ${already ? 'Rezervasyon mevcut' : full ? 'Yer kalmadı' : expired ? 'Süre doldu' : 'Rezervasyon yap'}
+        </button>
+      </div>
+    </div>
   </article>`;
 }
+
 
 function formatTime(value) {
   if (!value) return '—';
@@ -319,20 +432,60 @@ async function loadWeeklyMenus() {
   container.innerHTML = [...sections.entries()].map(([date, items]) => `<div class="menu-day-heading">${escapeHtml(formatDate(date))}</div>${items.map(menu => renderMenuCard(menu, false)).join('')}`).join('');
 }
 
+
+function updatePortionPrice(event) {
+  const select = event.target.closest('.portion-select');
+  if (!select) return;
+
+  const card = select.closest('.menu-card');
+  const priceElement = $('.menu-price', card);
+  if (!priceElement) return;
+
+  const fullPrice = Number(priceElement.dataset.fullPrice || 0);
+
+  const displayedPrice = select.value === 'yarim'
+    ? Math.round((fullPrice * 0.60 + Number.EPSILON) * 100) / 100
+    : fullPrice;
+
+  priceElement.textContent = money(displayedPrice);
+}
+
 async function bookMenu(menuId, button) {
   button.disabled = true;
   const original = button.textContent;
+
+  // Kartta porsiyon seçimi varsa seçilen değeri al.
+  const card = button.closest('.menu-card');
+  const portionSelect = $('.portion-select', card);
+  const porsiyon = portionSelect?.value || 'tam';
+
   button.textContent = 'İşleniyor…';
+
   try {
-    const data = await apiFetch('/rezervasyonlar', { method: 'POST', body: { menuId: Number(menuId) } });
+    const data = await apiFetch('/rezervasyonlar', {
+      method: 'POST',
+      body: {
+        menuId: Number(menuId),
+        porsiyon: porsiyon
+      }
+    });
+
     state.recentMenuIds.add(String(menuId));
+
     const result = getFirst(data, ['sonuc', 'rezervasyon', 'islem'], data);
     const balance = getFirst(result, ['bakiye'], getFirst(data, ['bakiye']));
     const cost = getFirst(result, ['ucret', 'tutar'], getFirst(data, ['ucret']));
-    toast(`Rezervasyon oluşturuldu. ${cost !== '' ? `Ücret: ${money(cost)}. ` : ''}${balance !== '' ? `Güncel bakiyen: ${money(balance)}.` : 'Bakiye bilgisi güncellendi.'}`, 'success');
+
+    toast(
+      `Rezervasyon oluşturuldu (${porsiyon === 'yarim' ? 'Yarım porsiyon' : 'Tam porsiyon'}). ${cost !== '' ? `Ücret: ${money(cost)}. ` : ''}${balance !== '' ? `Güncel bakiyen: ${money(balance)}.` : 'Bakiye bilgisi güncellendi.'}`,
+      'success'
+    );
+
     await loadReservations();
+
     if (!$('#page-daily').hidden) await loadDailyMenus();
     if (!$('#page-weekly').hidden) await loadWeeklyMenus();
+
   } catch (error) {
     button.disabled = false;
     button.textContent = original;
@@ -350,21 +503,60 @@ async function loadReservations() {
 
 function renderReservations() {
   const container = $('#reservation-list');
-  const rows = state.reservations.filter(item => state.reservationFilter === 'all' || getFirst(item, ['durum', 'status']) === state.reservationFilter);
+
+  const rows = state.reservations.filter(item =>
+    state.reservationFilter === 'all' ||
+    getFirst(item, ['durum', 'status']) === state.reservationFilter
+  );
+
   if (!rows.length) {
     container.innerHTML = '<div class="empty-state"><strong>Bu kategoride rezervasyon yok.</strong>Menüleri inceleyerek yeni bir rezervasyon oluşturabilirsin.</div>';
     return;
   }
+
   container.innerHTML = rows.map(item => {
     const id = getFirst(item, ['rezervasyon_id', 'rezervasyonId', 'id']);
     const status = getFirst(item, ['durum', 'status'], 'aktif');
     const menu = getFirst(item, ['ogun', 'ogun_ad'], 'Yemek rezervasyonu');
     const canteen = getFirst(item, ['yemekhane', 'yemekhane_ad'], 'Yemekhane');
     const date = getFirst(item, ['tarih', 'menu_tarihi']);
-    const canCancel = status === 'aktif' && !deadlinePassed(getFirst(item, ['rezervasyon_son', 'rezervasyonSon']));
+
+    const portion = getFirst(item, ['porsiyon'], 'tam');
+    const portionLabel = portion === 'yarim' ? 'Yarım porsiyon' : 'Tam porsiyon';
+
+    const canCancel = status === 'aktif' &&
+      !deadlinePassed(getFirst(item, ['rezervasyon_son', 'rezervasyonSon']));
+
     const stateLabel = ({ aktif: 'Aktif', kullanildi: 'Kullanıldı', iptal: 'İptal edildi' })[status] || status;
     const stateClass = status === 'aktif' ? 'pill-green' : status === 'iptal' ? 'pill-red' : 'pill';
-    return `<div class="reservation-row"><div class="reservation-main"><strong>${escapeHtml(menu)} · ${escapeHtml(canteen)}</strong><small>${escapeHtml(formatDate(date))}</small></div><div class="reservation-date reservation-detail"><span class="muted">Rezervasyon #${escapeHtml(id)}</span></div><div class="reservation-state"><span class="pill ${stateClass}">${escapeHtml(stateLabel)}</span></div><div class="reservation-money">${money(getFirst(item, ['ucret', 'tutar'], 0))}</div><div class="reservation-action">${canCancel ? `<button class="button button-secondary cancel-reservation" type="button" data-cancel-reservation="${escapeHtml(id)}">İptal et</button>` : ''}</div></div>`;
+
+    return `
+      <div class="reservation-row">
+        <div class="reservation-main">
+          <strong>${escapeHtml(menu)} · ${escapeHtml(canteen)}</strong>
+          <small>${escapeHtml(formatDate(date))}</small>
+          <small>${portionLabel}</small>
+        </div>
+
+        <div class="reservation-date reservation-detail">
+          <span class="muted">Rezervasyon #${escapeHtml(id)}</span>
+        </div>
+
+        <div class="reservation-state">
+          <span class="pill ${stateClass}">${escapeHtml(stateLabel)}</span>
+        </div>
+
+        <div class="reservation-money">
+          ${money(getFirst(item, ['ucret', 'tutar'], 0))}
+        </div>
+
+        <div class="reservation-action">
+          ${canCancel
+            ? `<button class="button button-secondary cancel-reservation" type="button" data-cancel-reservation="${escapeHtml(id)}">İptal et</button>`
+            : ''}
+        </div>
+      </div>
+    `;
   }).join('');
 }
 
@@ -455,6 +647,70 @@ async function submitReview(event) {
     toast('Değerlendirmen kaydedildi. Teşekkürler!', 'success');
     await loadReviews();
   } catch (error) { button.disabled = false; toast(error.message, 'error'); }
+}
+
+async function loadProfile() {
+  const container = $('#allergen-options');
+
+  container.innerHTML = '<span class="muted">Alerjenler yükleniyor...</span>';
+
+  const data = await apiFetch('/profil/alerjenler');
+
+  state.profileAllergens = unwrapArray(data, ['alerjenler']);
+
+  const selected = unwrapArray(data, ['seciliAlerjenler']).map(item => {
+    if (typeof item === 'object' && item !== null) {
+      return getFirst(item, ['alerjen_id', 'id']);
+    }
+    return item;
+  });
+
+  state.selectedAllergenIds = new Set(selected.map(String));
+
+  container.innerHTML = state.profileAllergens.map(item => {
+    const id = getFirst(item, ['id', 'alerjen_id']);
+    const name = getFirst(item, ['ad', 'name']);
+
+    return `
+      <label class="food-check">
+        <input
+          type="checkbox"
+          name="alerjenIds"
+          value="${escapeHtml(id)}"
+          ${state.selectedAllergenIds.has(String(id)) ? 'checked' : ''}
+        >
+        <span>${escapeHtml(name)}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+async function saveAllergenPreferences(event) {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  const button = $('button[type="submit"]', form);
+
+  const selectedIds = $$('input[name="alerjenIds"]:checked', form)
+    .map(input => Number(input.value));
+
+  button.disabled = true;
+
+  try {
+    await apiFetch('/profil/alerjenler', {
+      method: 'PUT',
+      body: { alerjenIds: selectedIds }
+    });
+
+    state.selectedAllergenIds = new Set(selectedIds.map(String));
+
+    toast('Alerjen tercihleriniz kaydedildi.', 'success');
+
+  } catch (error) {
+    toast(error.message, 'error');
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function loadMenuOptions() {
@@ -600,6 +856,7 @@ $('#reservations-refresh').addEventListener('click', () => loadReservations().ca
 $('#balance-refresh').addEventListener('click', () => loadBalance().catch(error => toast(error.message, 'error')));
 $('#topup-form').addEventListener('submit', topUp);
 $('#reviews-refresh').addEventListener('click', () => loadReviews().catch(error => toast(error.message, 'error')));
+$('#profile-allergen-form').addEventListener('submit', saveAllergenPreferences);
 $('#admin-refresh').addEventListener('click', () => loadAdmin().catch(error => toast(error.message, 'error')));
 $('#admin-menu-form').addEventListener('submit', saveAdminMenu);
 $('#admin-cancel-edit').addEventListener('click', resetAdminForm);
@@ -624,6 +881,8 @@ $('#weekly-menu-list').addEventListener('click', event => {
   const button = event.target.closest('[data-reserve-menu]');
   if (button) bookMenu(button.dataset.reserveMenu, button);
 });
+$('#daily-menu-list').addEventListener('change', updatePortionPrice);
+$('#weekly-menu-list').addEventListener('change', updatePortionPrice);
 $('#review-list').addEventListener('submit', submitReview);
 $('#admin-reports').addEventListener('click', event => {
   const button = event.target.closest('[data-edit-menu]');
