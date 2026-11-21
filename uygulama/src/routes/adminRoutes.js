@@ -14,11 +14,11 @@ import {
 
 const router = Router();
 
-// Bu rotaların tamamı yalnızca yöneticiye açıktır.
-router.use(oturumGerekli, rolGerekli('yonetici'));
+// Seçim listeleri: giriş yapmış bütün kullanıcılar okuyabilir.
+router.get('/secenekler', oturumGerekli, secenekleriGetir);
 
-// Menü oluşturma ekranı için seçim listeleri
-router.get('/secenekler', secenekleriGetir);
+// Bundan sonraki bütün rotalar yalnızca yöneticiye açıktır.
+router.use(oturumGerekli, rolGerekli('yonetici'));
 
 // Menü doluluk ve ortalama puan raporları
 router.get('/raporlar', raporlariGetir);

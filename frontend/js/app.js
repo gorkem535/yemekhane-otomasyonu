@@ -105,16 +105,33 @@ function showApp(user) {
   state.user = user || {};
   $('#login-view').hidden = true;
   $('#app-view').hidden = false;
-  const fullName = [getFirst(user, ['ad', 'isim'], ''), getFirst(user, ['soyad'], '')].filter(Boolean).join(' ') || getFirst(user, ['adSoyad', 'ad_soyad', 'eposta'], 'Kullanıcı');
+
+  const fullName = [
+    getFirst(user, ['ad', 'isim'], ''),
+    getFirst(user, ['soyad'], '')
+  ].filter(Boolean).join(' ') ||
+    getFirst(user, ['adSoyad', 'ad_soyad', 'eposta'], 'Kullanıcı');
+
   const role = getFirst(user, ['rol'], 'ogrenci');
+
   $('#user-name').textContent = fullName;
-  $('#user-role').textContent = ({ ogrenci: 'Öğrenci', personel: 'Personel', yonetici: 'Yönetici' })[role] || role;
-  $('#user-avatar').textContent = (fullName.trim()[0] || 'K').toLocaleUpperCase('tr-TR');
+  $('#user-role').textContent =
+    ({ ogrenci: 'Öğrenci', personel: 'Personel', yonetici: 'Yönetici' })[role] || role;
+  $('#user-avatar').textContent =
+    (fullName.trim()[0] || 'K').toLocaleUpperCase('tr-TR');
   $('#balance-owner').textContent = fullName;
   $('#admin-nav').hidden = role !== 'yonetici';
   $('#today-label').textContent = formatDate(todayISO());
   $('#weekly-start').value = todayISO();
-  changeView('daily');
+
+  // Önce yemekhane ve öğün seçeneklerini yükle, sonra günlük menüyü aç.
+  loadMenuOptions()
+    .then(() => changeView('daily'))
+    .catch(error => {
+      toast(`Filtre seçenekleri yüklenemedi: ${error.message}`, 'error');
+      changeView('daily');
+    });
+
   loadReservations().catch(() => {});
 }
 
@@ -440,7 +457,7 @@ async function submitReview(event) {
   } catch (error) { button.disabled = false; toast(error.message, 'error'); }
 }
 
-async function loadAdminOptions() {
+async function loadMenuOptions() {
   const data = await apiFetch('/yonetici/secenekler');
 
   const options = data.secenekler || data;
@@ -496,7 +513,7 @@ function renderAdminReports() {
 
 async function loadAdmin() {
   $('#admin-reports').innerHTML = '<div class="loading-state">Yönetici verileri yükleniyor…</div>';
-  await loadAdminOptions();
+  await loadMenuOptions();
   await loadAdminReports();
   if (!$('#admin-date').value) $('#admin-date').value = todayISO();
 }
