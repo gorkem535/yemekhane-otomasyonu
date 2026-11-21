@@ -1,5 +1,7 @@
 import express from 'express';
 import session from 'express-session';
+import { RedisStore } from 'connect-redis';
+import { redisClient } from './config/redis.js';
 
 import menuRoutes from './routes/menuRoutes.js';
 import authRoutes from './routes/authRoutes.js';
@@ -10,16 +12,25 @@ import adminRoutes from './routes/adminRoutes.js';
 
 const app = express();
 
+const sessionStore = new RedisStore({
+    client: redisClient,
+    prefix: 'oturum:',
+    ttl: 30 * 60,
+    disableTouch: false
+});
+
 app.disable('x-powered-by');
 
 app.use(express.json());
 
 // Oturum yönetimi
 app.use(session({
+    store: sessionStore,
     name: 'yemekhane.sid',
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     cookie: {
         httpOnly: true,
         secure: false,
