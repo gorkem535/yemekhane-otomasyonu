@@ -5,6 +5,10 @@ import {
     menuGuncelle
 } from '../repositories/adminRepository.js';
 
+import {
+    menuOnbellekleriniTemizle
+} from './menuCacheService.js';
+
 // Pozitif tam sayı kontrolü
 function pozitifTamSayi(deger, alan) {
     const sayi = Number(deger);
@@ -54,7 +58,7 @@ function tarihKontrolEt(deger) {
 function fiyatKontrolEt(deger, alan) {
     const metin = String(deger);
 
-    if (!/^\d+(\.\d{1,2})?$/.test(metin)) {
+   if (!/^\d+(\.\d{1,2})?$/.test(metin)) {
         const hata = new Error(
             `${alan} sıfır veya daha büyük ve en fazla iki ondalık basamaklı olmalıdır.`
         );
@@ -138,7 +142,19 @@ export async function yeniMenuOlustur(veri) {
     const menu = menuBilgileriniKontrolEt(veri);
 
     try {
-        return await menuOlustur(menu);
+        const sonuc = await menuOlustur(menu);
+
+        try {
+            await menuOnbellekleriniTemizle();
+        } catch (cacheError) {
+            console.error(
+                'Menü önbelleği temizlenemedi:',
+                cacheError.message
+            );
+        }
+
+        return sonuc;
+
     } catch (error) {
         if (error.errno === 1062) {
             error.statusCode = 409;
@@ -168,7 +184,17 @@ export async function mevcutMenuyuGuncelle(menuId, veri) {
             throw hata;
         }
 
+        try {
+            await menuOnbellekleriniTemizle();
+        } catch (cacheError) {
+            console.error(
+                'Menü önbelleği temizlenemedi:',
+                cacheError.message
+            );
+        }
+
         return sonuc;
+
     } catch (error) {
         if (error.errno === 1062) {
             error.statusCode = 409;

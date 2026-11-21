@@ -1,4 +1,8 @@
 import { menuleriListele } from '../repositories/menuRepository.js';
+import {
+    menuOnbellektenGetir,
+    menuOnbellegeYaz
+} from './menuCacheService.js';
 
 // Pozitif tam sayı kontrolü
 function pozitifTamSayiKontrol(deger, alanAdi) {
@@ -75,5 +79,31 @@ export async function menuleriGetir(sorgu) {
         throw hata;
     }
 
-    return await menuleriListele(filtreler);
+// Önce Redis önbelleğini kontrol et
+let onbellek = null;
+
+try {
+    onbellek = await menuOnbellektenGetir(filtreler);
+} catch (error) {
+    console.error('Redis önbelleği okunamadı:', error.message);
+}
+
+// Önbellekte veri varsa doğrudan döndür
+if (onbellek !== null) {
+    return onbellek;
+}
+
+// Önbellekte veri yoksa MySQL Replica üzerinden getir
+console.log('Menü önbelleği MISS (MySQL Replica).');
+
+const menuler = await menuleriListele(filtreler);
+
+// Gelen verileri Redis'e kaydet
+try {
+    await menuOnbellegeYaz(filtreler, menuler);
+} catch (error) {
+    console.error('Redis önbelleğine yazılamadı:', error.message);
+}
+
+return menuler;
 }
