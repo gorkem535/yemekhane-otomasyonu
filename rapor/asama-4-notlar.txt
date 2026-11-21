@@ -1,0 +1,45 @@
+AŞAMA 4 - MIGRATION, REPLİKASYON VE UYGULAMA TEST NOTLARI
+
+1) Migration öncesi veri sayımı (mysql-primary)
+Komut parola istemi kullanacak şekilde çalıştırıldı; parola komut satırına yazılmadı:
+  docker compose exec mysql-primary mysql -uroot -p yemekhane -e "SELECT ..."
+
+Sonuçlar:
+  kullanici_sayisi    : 30
+  menu_sayisi         : 86
+  rezervasyon_sayisi  : 369
+  alerjen_sayisi      : 14
+
+2) Uygulanan migration
+Dosya: db/init/04_degisiklik.sql
+- rezervasyonlar tablosuna porsiyon ENUM('tam','yarim') NOT NULL DEFAULT 'tam' sütunu eklendi.
+- kullanici_alerjenleri tablosu oluşturuldu.
+- sp_rezervasyon_yap üç parametreli hale getirildi: p_kullanici_id, p_menu_id, p_porsiyon.
+- Yalnızca öğle ve akşam öğünlerinde yarım porsiyona izin verilir (öğün ID 2 ve 3).
+- Yarım porsiyon ücreti tam ücretin %60'ı olarak ROUND(... * 0.60, 2) ile hesaplanır.
+- Kahvaltıda yarım porsiyon seçimi stored procedure tarafında da engellenir.
+
+3) Primary / Replica doğrulaması
+- SHOW CREATE TABLE rezervasyonlar çıktılarında porsiyon sütunu her iki sunucuda görüldü.
+- SHOW CREATE TABLE kullanici_alerjenleri çıktılarında yeni tablo ve foreign key ilişkileri görüldü.
+- SHOW CREATE PROCEDURE sp_rezervasyon_yap çıktıları Primary ve Replica üzerinde üç parametreli yordam tanımını gösterdi.
+- İlgili kanıt ekran görüntüleri ekran-goruntuleri/asama-4 klasöründedir.
+
+4) Mevcut verinin korunması
+Migration sonrası rezervasyon kontrolü:
+  tam porsiyon     : 369
+  toplam rezervasyon: 369
+Sonuç: Migration öncesi mevcut 369 rezervasyon tam porsiyon olarak korundu.
+
+5) Redis eski menü anahtarlarının temizlenmesi
+- Uygulama container'ı geçici olarak durduruldu.
+- menu:* desenindeki 28 eski menü önbelleği anahtarı silindi.
+- Temizleme sonrası menu:* taraması 0 anahtar döndürdü.
+- Oturum anahtarlarına dokunulmadı.
+- Uygulama container'ı yeniden başlatıldı.
+
+6) Sürüm kontrolü
+- Migration commit: 52af8fe (Aşama 4 migration: porsiyon ve alerjen tercihleri)
+- Uygulama ve arayüz commit: 2d5458e (Aşama 4: alerjen tercihleri ve yarım porsiyon desteği)
+
+GÜVENLİK NOTU: Veritabanı parolaları ve oturum token'ları rapor paketine eklenmemiştir.

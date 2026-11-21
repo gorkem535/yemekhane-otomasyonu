@@ -1,0 +1,20 @@
+AŞAMA 3 - REDIS OTURUM VE MENÜ ÖNBELLEĞİ TEST NOTLARI
+
+1) Oturum deposu
+- Redis üzerinde oturum:* anahtar deseni kontrol edildi.
+- Oturum TTL değeri art arda isteklerden sonra 1017 saniyeden 1792 saniyeye yenilendi.
+- Çıkış yapıldıktan sonra oturum:* taraması boş sonuç verdi.
+- Gerçek oturum token'ı bu rapor paketinde bulunmaz.
+
+Güvenli kontrol komutları:
+  docker compose exec redis redis-cli --scan --pattern "oturum:*"
+  docker compose exec redis redis-cli TTL "oturum:<gizli-token>"
+
+2) Menü önbelleği
+- Menü anahtarları menu:{yemekhane_id}:{tarih}:{ogun_id} deseninde oluşturuldu.
+- Örnek menü anahtarı TTL değeri: 15759 saniye.
+- Sorgu önbelleği TTL değeri: 15753 saniye.
+- Uygulama günlüklerinde MISS (MySQL Replica'dan okuma) ve HIT (Redis'ten okuma) görüldü.
+- Menü güncelleme/geçersizleştirme testinde 9 menü anahtarı silindi.
+
+Not: Bu dosyada gerçek token veya parola bulunmaz.
